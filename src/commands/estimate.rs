@@ -1,3 +1,4 @@
+use alloy_primitives::U256;
 use circle_iris::{Environment, IrisClient};
 use serde::Serialize;
 
@@ -38,7 +39,9 @@ pub async fn run(args: EstimateArgs) -> Result<()> {
     let iris = IrisClient::new(iris_environment(source.env));
 
     let (protocol_fee, received_amount, estimated_time, fallback_to_standard) = match args.speed {
-        TransferSpeedArg::Standard => (0u128, amount, destination.standard_time_label(), false),
+        TransferSpeedArg::Standard => {
+            (U256::ZERO, amount, destination.standard_time_label(), false)
+        }
         TransferSpeedArg::Fast => match iris
             .fast_fee_bps(source.cctp_domain, destination.cctp_domain)
             .await
@@ -51,7 +54,7 @@ pub async fn run(args: EstimateArgs) -> Result<()> {
                     .ok_or_else(|| CliError::InvalidInput("amount too small for fee".into()))?;
                 (fee, received, destination.fast_time_label(), false)
             }
-            None => (0u128, amount, destination.standard_time_label(), true),
+            None => (U256::ZERO, amount, destination.standard_time_label(), true),
         },
     };
 

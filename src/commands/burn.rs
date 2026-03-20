@@ -67,7 +67,7 @@ pub async fn run(args: BurnArgs) -> Result<()> {
     );
 
     let usdc = usdc_address(source)?;
-    let amount = alloy_primitives::U256::from(amount_atomic);
+    let amount = amount_atomic;
 
     let approval_tx_hash = bridge
         .ensure_approval(usdc, sender, amount)

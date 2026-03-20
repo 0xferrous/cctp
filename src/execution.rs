@@ -112,7 +112,7 @@ pub(crate) fn decode_hex_bytes(label: &str, value: &str) -> Result<Vec<u8>> {
 
 pub(crate) async fn max_fee_for_speed(
     speed: TransferSpeedArg,
-    amount_atomic: u128,
+    amount_atomic: U256,
     source_domain: u32,
     destination_domain: u32,
     iris: &circle_iris::IrisClient,
@@ -130,8 +130,8 @@ pub(crate) async fn max_fee_for_speed(
                     )
                 })?;
             let fee = amount::calculate_fee(amount_atomic, fee_bps)?;
-            let buffered_fee = fee.saturating_mul(110).div_ceil(100);
-            Ok((true, U256::from(buffered_fee)))
+            let buffered_fee = fee.saturating_mul(U256::from(110)) / U256::from(100);
+            Ok((true, buffered_fee))
         }
     }
 }
