@@ -1,0 +1,738 @@
+# Source: https://developers.circle.com/openapi/cctp.yaml
+# Discovered from: https://developers.circle.com/api-reference/cctp/all/get-public-keys-v2
+#
+# Local mutations from the hosted spec for Progenitor compatibility:
+# 1. Added components/schemas/ErrorResponse.
+# 2. Repointed components/responses/NotFound and components/responses/BadRequest
+#    to that shared ErrorResponse schema instead of inline object schemas.
+# 3. Removed `format: uuid` from components/schemas/XRequestId.
+openapi: 3.0.2
+info:
+  version: '1.0'
+  title: Cross-Chain Transfer Protocol (CCTP)
+  description: >
+    Circle's Cross-Chain Transfer Protocol enables you to build seamless user
+    experiences for sending and transacting USDC natively across blockchains.
+
+
+    CCTP endpoints enable advanced capabilities such as fetching attestations
+    for faster-than-finality burn events, verifying public keys across versions,
+    accessing transaction details, querying Fast Transfer allowances and fees,
+    and initiating re-attestation processes.
+servers:
+  - url: https://iris-api-sandbox.circle.com
+  - url: https://iris-api.circle.com
+tags:
+  - name: CCTP
+    description: Cross-Chain Transfer Protocol endpoints
+  - name: CCTP V1 (Legacy)
+    description: Legacy Cross-Chain Transfer Protocol endpoints
+paths:
+  /v1/attestations/{messageHash}:
+    get:
+      operationId: getAttestation
+      summary: Get an attestation
+      description: >-
+        Retrieves the signed attestation for a USDC burn event on the source
+        chain.
+      tags:
+        - CCTP V1 (Legacy)
+      parameters:
+        - $ref: '#/components/parameters/MessageHashPath'
+      responses:
+        '200':
+          description: >-
+            Successfully retrieved either the signed attestation or the message
+            is still pending block confirmations.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetAttestationV1Response'
+              examples:
+                complete:
+                  value:
+                    attestation: >-
+                      0xdc485fb2f9a8f68c871f4ca7386dee9086ff9d4387756990c9c4b9280338325252866861f9495dce3128cd524d525c44e8e7b731dedd3098a618dcc19c45be1e1c
+                    status: complete
+                pending confirmations:
+                  value:
+                    attestation: null
+                    status: pending_confirmations
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/publicKeys:
+    get:
+      operationId: getPublicKeys
+      summary: List attestation public keys
+      description: >-
+        Retrieves a list of the currently active public keys for verifying
+        attestation signatures.
+      tags:
+        - CCTP V1 (Legacy)
+      responses:
+        '200':
+          description: Successfully retrieved public keys.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicKeysV1Response'
+              examples:
+                response:
+                  value:
+                    publicKeys:
+                      - >-
+                        0x04fc192351b97838713efbc63351e3b71607cc7fc0a74fadaa12d39a693713529bf392c0eeaff62eff2f06b47a4c7cd5f83159e4145444f817d5e7f24e256c6278
+  /v1/messages/{sourceDomainId}/{transactionHash}:
+    get:
+      operationId: getMessages
+      summary: Get a list of messages
+      description: Retrieves message and attestation details for CCTP V1 messages.
+      tags:
+        - CCTP V1 (Legacy)
+      parameters:
+        - $ref: '#/components/parameters/SourceDomainIdPath'
+        - $ref: '#/components/parameters/TransactionHashPath'
+      responses:
+        '200':
+          description: >-
+            Successfully retrieved messages for the given domain and transaction
+            hash.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessagesV1Response'
+              examples:
+                complete:
+                  value:
+                    messages:
+                      - attestation: >-
+                          0xdc485fb2f9a8f68c871f4ca7386dee9086ff9d4387756990c9c4b9280338325252866861f9495dce3128cd524d525c44e8e7b731dedd3098a618dcc19c45be1e1c
+                        message: >-
+                          0x00000000000000050000000300000000000194c2a65fc943419a5ad590042fd67c9791fd015acf53a54cc823edb8ff81b9ed722e00000000000000000000000019330d10d9cc8751218eaf51e8885d058642e08a000000000000000000000000fc05ad74c6fe2e7046e091d6ad4f660d2a15976200000000c6fa7af3bedbad3a3d65f36aabc97431b1bbe4c2d2f6e0e47ca60203452f5d610000000000000000000000002d475f4746419c83be23056309a8e2ac33b30e3b0000000000000000000000000000000000000000000000000000000002b67df0feae5e08f5e6bf04d8c1de7dada9235c56996f4420b14371d6c6f3ddd2f2da78
+                        eventNonce: '9682'
+                pending confirmations:
+                  value:
+                    messages:
+                      - attestation: PENDING
+                        message: >-
+                          0x00000000000000050000000300000000000194c2a65fc943419a5ad590042fd67c9791fd015acf53a54cc823edb8ff81b9ed722e00000000000000000000000019330d10d9cc8751218eaf51e8885d058642e08a000000000000000000000000fc05ad74c6fe2e7046e091d6ad4f660d2a15976200000000c6fa7af3bedbad3a3d65f36aabc97431b1bbe4c2d2f6e0e47ca60203452f5d610000000000000000000000002d475f4746419c83be23056309a8e2ac33b30e3b0000000000000000000000000000000000000000000000000000000002b67df0feae5e08f5e6bf04d8c1de7dada9235c56996f4420b14371d6c6f3ddd2f2da78
+                        eventNonce: '9682'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v2/publicKeys:
+    get:
+      operationId: getPublicKeysV2
+      summary: Get public keys
+      description: >-
+        Returns the public keys for validating attestations across all supported
+        versions of CCTP.
+      tags:
+        - CCTP
+      responses:
+        '200':
+          description: >-
+            Successfully retrieved a list of public keys with their respective
+            CCTP versions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicKeysV2Response'
+              examples:
+                response:
+                  value:
+                    publicKeys:
+                      - publicKey: >-
+                          0x04fc192351b97838713efbc63351e3b71607cc7fc0a74fadaa12d39a693713529bf392c0eeaff62eff2f06b47a4c7cd5f83159e4145444f817d5e7f24e256c6278
+                        cctpVersion: 1
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /v2/messages/{sourceDomainId}:
+    get:
+      operationId: getMessagesV2
+      summary: Get messages and attestations
+      description: >-
+        Retrieves messages and attestations for a given transaction hash or
+        nonce. Each message for a given transaction hash is ordered by ascending
+        log index.
+      tags:
+        - CCTP
+      parameters:
+        - $ref: '#/components/parameters/SourceDomainIdPath'
+        - $ref: '#/components/parameters/TransactionHashQuery'
+        - $ref: '#/components/parameters/NonceQuery'
+      responses:
+        '200':
+          description: Successfully retrieved messages.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessagesV2Response'
+              examples:
+                response:
+                  value:
+                    messages:
+                      - message: >-
+                          0x00000000000000050000000300000000000194c2a65fc943419a5ad590042fd67c9791fd015acf53a54cc823edb8ff81b9ed722e00000000000000000000000019330d10d9cc8751218eaf51e8885d058642e08a000000000000000000000000fc05ad74c6fe2e7046e091d6ad4f660d2a15976200000000c6fa7af3bedbad3a3d65f36aabc97431b1bbe4c2d2f6e0e47ca60203452f5d610000000000000000000000002d475f4746419c83be23056309a8e2ac33b30e3b0000000000000000000000000000000000000000000000000000000002b67df0feae5e08f5e6bf04d8c1de7dada9235c56996f4420b14371d6c6f3ddd2f2da78
+                        eventNonce: '9682'
+                        attestation: >-
+                          0x6edd90f4a0ad0212fd9fbbd5058a25aa8ee10ce77e4fc143567bbe73fb6e164f384a3e14d350c8a4fc50b781177297e03c16b304e8d7656391df0f59a75a271f1b
+                        decodedMessage:
+                          sourceDomain: '7'
+                          destinationDomain: '5'
+                          nonce: '569'
+                          sender: '0xca9142d0b9804ef5e239d3bc1c7aa0d1c74e7350'
+                          recipient: '0xb7317b4EFEa194a22bEB42506065D3772C2E95EF'
+                          destinationCaller: '0xf2Edb1Ad445C6abb1260049AcDDCA9E84D7D8aaA'
+                          messageBody: >-
+                            0x00000000000000050000000300000000000194c2a65fc943419a5ad590042fd67c9791fd015acf53a54cc823edb8ff81b9ed722e00000000000000000000000019330d10d9cc8751218eaf51e8885d058642e08a000000000000000000000000fc05ad74c6fe2e7046e091d6ad4f660d2a15976200000000c6fa7af3bedbad3a3d65f36aabc97431b1bbe4c2d2f6e0e47ca60203452f5d610000000000000000000000002d475f4746419c83be23056309a8e2ac33b30e3b0000000000000000000000000000000000000000000000000000000002b67df0feae5e08f5e6bf04d8c1de7dada9235c56996f4420b14371d6c6f3ddd2f2da78
+                          decodedMessageBody:
+                            burnToken: '0x4Bc078D75390C0f5CCc3e7f59Ae2159557C5eb85'
+                            mintRecipient: '0xb7317b4EFEa194a22bEB42506065D3772C2E95EF'
+                            amount: '5000'
+                            messageSender: '0xca9142d0b9804ef5e239d3bc1c7aa0d1c74e7350'
+                        cctpVersion: 2
+                        status: complete
+                        forwardState: PENDING
+                        forwardTxHash: >-
+                          0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v2/reattest/{nonce}:
+    post:
+      operationId: reattestMessage
+      summary: Re-attest a pre-finality message
+      description: >
+        The re-attestation flow allows the relayer to obtain a higher level of
+        finality than was originally requested on the source chain, while still
+        being forced to pay the fee since allowance was reserved. This flow
+        resolves the case where a sender specifies a finality threshold lower
+        than the destination chain recipient requires.
+      tags:
+        - CCTP
+      parameters:
+        - $ref: '#/components/parameters/NoncePath'
+      responses:
+        '200':
+          description: Successfully started the re-attestation process.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReattestationResponseV2'
+              examples:
+                response:
+                  value:
+                    message: Re-attestation successfully requested for nonce.
+                    nonce: '234'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v2/fastBurn/USDC/allowance:
+    get:
+      operationId: getFastBurnUsdcAllowance
+      summary: Get USDC Fast Transfer allowance
+      description: Retrieves the available USDC Fast Transfer allowance remaining.
+      tags:
+        - CCTP
+      responses:
+        '200':
+          description: Successfully retrieved the available USDC Fast Burn allowance.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/USDCFastBurnAllowanceResponseV2'
+              examples:
+                response:
+                  value:
+                    allowance: 123999.999999
+                    lastUpdated: '2025-01-23T10:00:00Z'
+  /v2/burn/USDC/fees/{sourceDomainId}/{destDomainId}:
+    get:
+      operationId: getBurnUsdcFees
+      summary: Get USDC transfer fees
+      description: >-
+        Retrieves the applicable fees for a USDC transfer between the specified
+        source and destination domains. The fee is returned in basis points (1 =
+        0.01%).
+      tags:
+        - CCTP
+      parameters:
+        - $ref: '#/components/parameters/SourceDomainIdPath'
+        - $ref: '#/components/parameters/DestinationDomainIdPath'
+        - in: query
+          name: forward
+          description: >-
+            Whether to include fees for using the Circle Forwarder in the return
+            value.
+          required: false
+          schema:
+            type: boolean
+            default: false
+        - in: query
+          name: hyperCoreDeposit
+          description: >-
+            Whether to include the forwarding fee for depositing into HyperCore
+            in the return value. This parameter should only be used if the
+            `forward` parameter is set to `true` and the destination domain is
+            HyperEVM.
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Successfully retrieved the USDC transfer fees.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/USDCBurnFeesResponseV2'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  parameters:
+    MessageHashPath:
+      name: messageHash
+      description: >
+        Message hash for the message being bridged. This can be generated using
+        the `keccak256` hash of the message bytes emitted by the `MessageSent`
+        event.
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: ^0x[a-fA-F0-9]{64}$
+        example: '0x912f22a13e9ccb979b621500f6952b2afd6e75be7eadaed93fc2625fe11c52a2'
+    SourceDomainIdPath:
+      name: sourceDomainId
+      description: Source domain identifier for a blockchain on CCTP.
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 0
+        example: 3
+    TransactionHashPath:
+      name: transactionHash
+      description: Transaction hash that contains the message being transferred.
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: ^0x[a-fA-F0-9]{64}$
+        example: '0x912f22a13e9ccb979b621500f6952b2afd6e75be7eadaed93fc2625fe11c52a2'
+    TransactionHashQuery:
+      name: transactionHash
+      in: query
+      required: false
+      description: >
+        The transaction hash to filter messages. At least one of
+        `transactionHash` or `nonce` is required.
+      schema:
+        type: string
+        example: '0x912f22a13e9ccb979b621500f6952b2afd6e75be7eadaed93fc2625fe11c52a2'
+    NonceQuery:
+      name: nonce
+      in: query
+      required: false
+      description: >
+        The nonce to filter messages. At least one of `transactionHash` or
+        `nonce` is required.
+      schema:
+        type: string
+        example: '234'
+    NoncePath:
+      name: nonce
+      in: path
+      required: true
+      description: |
+        The nonce of the pre-finality message to re-attest as finalized.
+      schema:
+        type: string
+        example: '234'
+    DestinationDomainIdPath:
+      name: destDomainId
+      description: Destination domain identifier for a blockchain on CCTP.
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 0
+        example: 3
+  schemas:
+    AttestationStatus:
+      type: string
+      description: >-
+        Status of the attestation, whether it is signed or awaiting more block
+        confirmations.
+      enum:
+        - complete
+        - pending_confirmations
+    GetAttestationV1Response:
+      title: GetAttestationSuccessResponse
+      type: object
+      description: Signed or pending attestation.
+      required:
+        - status
+      properties:
+        attestation:
+          type: string
+          description: >
+            Signed attestation corresponding to the given `messageHash`
+            parameter. This is null if the event has been seen but the
+            attestation is still pending block confirmations.
+          example: >-
+            0x6edd90f4a0ad0212fd9fbbd5058a25aa8ee10ce77e4fc143567bbe73fb6e164f384a3e14d350c8a4fc50b781177297e03c16b304e8d7656391df0f59a75a271f1b
+          nullable: true
+        status:
+          $ref: '#/components/schemas/AttestationStatus'
+    XRequestId:
+      type: string
+      description: >-
+        A unique identifier, which can be helpful for identifying a request when
+        communicating with Circle support.
+      example: 2adba88e-9d63-44bc-b975-9b6ae3440dde
+    PublicKeysV1Response:
+      type: object
+      description: An array of public keys as strings.
+      required:
+        - publicKeys
+      properties:
+        publicKeys:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            example: >-
+              0x04fc192351b97838713efbc63351e3b71607cc7fc0a74fadaa12d39a693713529bf392c0eeaff62eff2f06b47a4c7cd5f83159e4145444f817d5e7f24e256c6278
+    MessageNonce:
+      type: string
+      description: The nonce associated with the message.
+      example: '9682'
+    MessageV1:
+      type: object
+      required:
+        - attestation
+        - message
+        - eventNonce
+      properties:
+        attestation:
+          type: string
+          description: >-
+            Signed attestation. This is 'PENDING' if the event has been seen but
+            the attestation is still pending block confirmations.
+          example: >-
+            0x6edd90f4a0ad0212fd9fbbd5058a25aa8ee10ce77e4fc143567bbe73fb6e164f384a3e14d350c8a4fc50b781177297e03c16b304e8d7656391df0f59a75a271f1b
+        message:
+          type: string
+          description: Raw message bytes returned in hex format.
+          example: >-
+            0x00000000000000050000000300000000000194c2a65fc943419a5ad590042fd67c9791fd015acf53a54cc823edb8ff81b9ed722e00000000000000000000000019330d10d9cc8751218eaf51e8885d058642e08a000000000000000000000000fc05ad74c6fe2e7046e091d6ad4f660d2a15976200000000c6fa7af3bedbad3a3d65f36aabc97431b1bbe4c2d2f6e0e47ca60203452f5d610000000000000000000000002d475f4746419c83be23056309a8e2ac33b30e3b0000000000000000000000000000000000000000000000000000000002b67df0feae5e08f5e6bf04d8c1de7dada9235c56996f4420b14371d6c6f3ddd2f2da78
+        eventNonce:
+          $ref: '#/components/schemas/MessageNonce'
+    MessagesV1Response:
+      title: GetMessagesResponse
+      type: object
+      description: >-
+        CCTP messages corresponding to a given transaction hash and source
+        domain ID.
+      required:
+        - messages
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageV1'
+    CctpVersion:
+      type: integer
+      enum:
+        - 1
+        - 2
+      example: 2
+    PublicKey:
+      type: object
+      properties:
+        publicKey:
+          type: string
+          example: >-
+            0x04fc192351b97838713efbc63351e3b71607cc7fc0a74fadaa12d39a693713529bf392c0eeaff62eff2f06b47a4c7cd5f83159e4145444f817d5e7f24e256c6278
+        cctpVersion:
+          $ref: '#/components/schemas/CctpVersion'
+    PublicKeysV2Response:
+      title: GetPublicKeysResponse
+      type: object
+      properties:
+        publicKeys:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicKey'
+    DomainId:
+      type: string
+      description: The ID of a CCTP domain.
+      example: '0'
+    Address:
+      description: >
+        Blockchain generated unique identifier, associated with wallet
+        (account), smart contract or other blockchain objects.
+      type: string
+      pattern: ^0x[a-fA-F0-9]{40}$
+      example: '0xca9142d0b9804ef5e239d3bc1c7aa0d1c74e7350'
+    DecodedMessageBodyV2:
+      type: object
+      nullable: true
+      description: >-
+        Decoded representation of the message body. Null or empty if decoding
+        fails or is not applicable.
+      properties:
+        burnToken:
+          $ref: '#/components/schemas/Address'
+        mintRecipient:
+          $ref: '#/components/schemas/Address'
+        amount:
+          type: string
+          description: Amount of burned tokens
+          example: '10000'
+        messageSender:
+          $ref: '#/components/schemas/Address'
+        maxFee:
+          type: string
+          description: >-
+            Maximum fee to pay on the destination domain, specified in units of
+            `burnToken`.
+          example: '1000'
+        feeExecuted:
+          type: string
+          description: >-
+            Actual fee charged on the destination domain, specified in units of
+            `burnToken`.
+          example: '1000'
+        expirationBlock:
+          type: string
+          description: Block number at which the message expires.
+          example: '12345678'
+        hookData:
+          type: string
+          description: >-
+            Arbitrary data to be included in the `depositForBurn` on source
+            domain that is executed on destination domain.
+    DecodedMessageV2:
+      type: object
+      nullable: true
+      description: Decoded representation of the message. Null or empty if decoding fails.
+      properties:
+        sourceDomain:
+          $ref: '#/components/schemas/DomainId'
+        destinationDomain:
+          $ref: '#/components/schemas/DomainId'
+        nonce:
+          $ref: '#/components/schemas/MessageNonce'
+        sender:
+          $ref: '#/components/schemas/Address'
+        recipient:
+          $ref: '#/components/schemas/Address'
+        destinationCaller:
+          $ref: '#/components/schemas/Address'
+        minFinalityThreshold:
+          type: string
+          description: Minimum finality threshold before allowed to attest.
+          enum:
+            - '1000'
+            - '2000'
+        finalityThresholdExecuted:
+          type: string
+          description: Actual finality threshold executed from source chain.
+          enum:
+            - '1000'
+            - '2000'
+        messageBody:
+          type: string
+          description: Application-specific message to be handled by recipient.
+        decodedMessageBody:
+          $ref: '#/components/schemas/DecodedMessageBodyV2'
+    DelayReason:
+      type: string
+      nullable: true
+      description: Reason for message processing delay.
+      enum:
+        - insufficient_fee
+        - amount_above_max
+        - insufficient_allowance_available
+      x-enum-descriptions:
+        'null': No delay or unknown cause of delay.
+        insufficient_fee: The max fee specified is insufficient for fast processing.
+        amount_above_max: The burn amount exceeds the maximum allowance limit.
+        insufficient_allowance_available: The burn amount exceeds the remaining allowance available.
+    ForwardState:
+      type: string
+      description: The state of the forward transaction.
+      example: PENDING
+    MessageV2:
+      type: object
+      properties:
+        message:
+          type: string
+          description: >-
+            The hex-encoded message. `0x` if the attestation is not yet
+            available.
+          example: >-
+            0x00000000000000050000000300000000000194c2a65fc943419a5ad590042fd67c9791fd015acf53a54cc823edb8ff81b9ed722e00000000000000000000000019330d10d9cc8751218eaf51e8885d058642e08a000000000000000000000000fc05ad74c6fe2e7046e091d6ad4f660d2a15976200000000c6fa7af3bedbad3a3d65f36aabc97431b1bbe4c2d2f6e0e47ca60203452f5d610000000000000000000000002d475f4746419c83be23056309a8e2ac33b30e3b0000000000000000000000000000000000000000000000000000000002b67df0feae5e08f5e6bf04d8c1de7dada9235c56996f4420b14371d6c6f3ddd2f2da78
+        eventNonce:
+          $ref: '#/components/schemas/MessageNonce'
+        attestation:
+          type: string
+          nullable: true
+          description: The attestation. `PENDING` if the attestation is not yet available.
+          example: >-
+            0x6edd90f4a0ad0212fd9fbbd5058a25aa8ee10ce77e4fc143567bbe73fb6e164f384a3e14d350c8a4fc50b781177297e03c16b304e8d7656391df0f59a75a271f1b
+        decodedMessage:
+          $ref: '#/components/schemas/DecodedMessageV2'
+        cctpVersion:
+          $ref: '#/components/schemas/CctpVersion'
+        status:
+          $ref: '#/components/schemas/AttestationStatus'
+        delayReason:
+          $ref: '#/components/schemas/DelayReason'
+        forwardState:
+          $ref: '#/components/schemas/ForwardState'
+        forwardTxHash:
+          description: The transaction hash of the forward transaction.
+          type: string
+          pattern: ^0x[a-fA-F0-9]+$
+          example: '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890'
+    MessagesV2Response:
+      title: GetMessagesResponse
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageV2'
+    ReattestationResponseV2:
+      title: ReattestMessageResponse
+      type: object
+      properties:
+        message:
+          type: string
+          description: Confirmation that the re-attestation process has started.
+          example: Re-attestation successfully requested for nonce.
+        nonce:
+          $ref: '#/components/schemas/MessageNonce'
+    UtcTimestamp:
+      type: string
+      format: date-time
+      description: >
+        A UTC timestamp in ISO 8601 format, representing the date and time of an
+        event.
+      example: '2025-01-23T10:00:00Z'
+    USDCFastBurnAllowanceResponseV2:
+      title: GetFastBurnUSDCAllowanceResponse
+      type: object
+      properties:
+        allowance:
+          type: number
+          description: >-
+            The current USDC Fast Burn allowance remaining, in full units of
+            USDC up to 6 decimals.
+          example: 123999.999999
+        lastUpdated:
+          $ref: '#/components/schemas/UtcTimestamp'
+    USDCBurnFeesResponseV2:
+      title: GetBurnUSDCFeesResponse
+      type: array
+      items:
+        type: object
+        required:
+          - finalityThreshold
+          - minimumFee
+        properties:
+          finalityThreshold:
+            type: integer
+            description: >-
+              The finality threshold, such as block confirmations, used to
+              determine whether the transfer qualifies as a Fast or Standard
+              Transfer.
+          minimumFee:
+            type: number
+            description: >-
+              Minimum fees for the transfer, expressed in basis points (bps).
+              For example, 1 = 0.01%.
+          forwardFee:
+            type: object
+            description: >-
+              Gas and forwarding fees for using the Circle Forwarder in USDC
+              minor units.
+            properties:
+              low:
+                type: integer
+                description: The low gas estimate plus forwarding fee.
+                example: 90
+              medium:
+                type: integer
+                description: The medium gas estimate plus forwarding fee.
+                example: 110
+              high:
+                type: integer
+                description: The high gas estimate plus forwarding fee.
+                example: 160
+      example:
+        - finalityThreshold: 1000
+          minimumFee: 1
+          forwardFee:
+            low: 90
+            medium: 110
+            high: 160
+        - finalityThreshold: 2000
+          minimumFee: 0
+          forwardFee:
+            low: 90
+            medium: 110
+            high: 160
+    ErrorResponse:
+      type: object
+      title: ErrorResponse
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+          description: Code that corresponds to the error.
+        message:
+          type: string
+          description: Message that describes the error.
+  headers:
+    XRequestId:
+      description: >
+        Developer-provided header parameter or Circle-generated universally
+        unique identifier (UUID v4). Useful for identifying a specific request
+        when communicating with Circle Support.
+      schema:
+        $ref: '#/components/schemas/XRequestId'
+  responses:
+    NotFound:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: 404
+            message: Not found.
+      description: Specified resource was not found.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+    BadRequest:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: 400
+            message: Bad request.
+      description: Request cannot be processed due to a client error.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
