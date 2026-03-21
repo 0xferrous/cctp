@@ -118,6 +118,8 @@ pub(crate) struct BurnArgs {
     #[command(flatten)]
     pub wallet: WalletOpts,
     #[command(flatten)]
+    pub solana_wallet: SolanaWalletArgs,
+    #[command(flatten)]
     pub rpc: RpcArgs,
     #[arg(long)]
     pub json: bool,
@@ -133,6 +135,8 @@ pub(crate) struct ClaimArgs {
     pub to_chain: Option<String>,
     #[command(flatten)]
     pub wallet: WalletOpts,
+    #[command(flatten)]
+    pub solana_signer: SolanaSignerArgs,
     #[command(flatten)]
     pub rpc: RpcArgs,
     #[arg(long)]
@@ -156,6 +160,8 @@ pub(crate) struct BridgeArgs {
     #[command(flatten)]
     pub wallet: WalletOpts,
     #[command(flatten)]
+    pub solana_wallet: SolanaWalletArgs,
+    #[command(flatten)]
     pub rpc: RpcArgs,
     #[arg(long)]
     pub json: bool,
@@ -169,4 +175,22 @@ pub(crate) struct ReattestArgs {
     pub nonce: String,
     #[arg(long)]
     pub json: bool,
+}
+
+#[derive(Args, Debug, Default)]
+pub(crate) struct SolanaSignerArgs {
+    #[arg(long = "solana-mnemonic")]
+    pub solana_mnemonic: Option<String>,
+    #[arg(long = "solana-passphrase", default_value_t = String::new())]
+    pub solana_passphrase: String,
+    #[arg(long = "solana-account-index", default_value_t = 0)]
+    pub solana_account_index: u32,
+}
+
+#[derive(Args, Debug, Default)]
+pub(crate) struct SolanaWalletArgs {
+    #[command(flatten)]
+    pub signer: SolanaSignerArgs,
+    #[arg(long = "solana-token-account")]
+    pub solana_token_account: Option<String>,
 }

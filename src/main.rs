@@ -7,6 +7,7 @@ mod error;
 #[path = "execution.rs"]
 mod execution;
 mod output;
+mod solana;
 
 use clap::Parser;
 use error::Result;
