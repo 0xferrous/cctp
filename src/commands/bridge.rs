@@ -30,10 +30,11 @@ use crate::{
     solana::{
         DepositForBurnAccountsV2, DepositForBurnParamsV2, build_deposit_for_burn_instruction_v2,
         build_receive_message_instruction_from_canonical_message_v2, build_signed_transaction,
-        cctp_v2_deposit_for_burn_pdas, derive_keypair_from_mnemonic, evm_address_to_pubkey_bytes32,
-        finality_threshold_for_speed, latest_blockhash, parse_pubkey_arg,
+        build_signed_transaction_with_signers, cctp_v2_deposit_for_burn_pdas,
+        derive_keypair_from_mnemonic, evm_address_to_pubkey_bytes32, finality_threshold_for_speed,
+        latest_blockhash, parse_pubkey_arg,
         send_and_confirm_transaction as send_and_confirm_solana_transaction, solana_rpc_client,
-        solana_usdc_mint,
+        solana_usdc_mint, usdc_associated_token_address,
     },
 };
 
@@ -381,15 +382,6 @@ async fn run_solana_bridge(
         .ok_or_else(|| {
             CliError::InvalidInput("missing --solana-mnemonic for Solana bridge".into())
         })?;
-    let burn_token_account = parse_pubkey_arg(
-        "solana token account",
-        args.solana_wallet
-            .solana_token_account
-            .as_deref()
-            .ok_or_else(|| {
-                CliError::InvalidInput("missing --solana-token-account for Solana bridge".into())
-            })?,
-    )?;
     let amount_atomic = parse_usdc_amount(&args.amount)?;
     let amount = u64::try_from(amount_atomic)
         .map_err(|_| CliError::InvalidInput("Solana burn amount exceeds u64 token units".into()))?;
@@ -401,6 +393,10 @@ async fn run_solana_bridge(
         args.solana_wallet.signer.solana_account_index,
     )?;
     let solana_sender = solana_signer.pubkey();
+    let burn_token_account = match args.solana_wallet.solana_token_account.as_deref() {
+        Some(account) => parse_pubkey_arg("solana token account", account)?,
+        None => usdc_associated_token_address(&solana_sender, source.env)?,
+    };
     let source_rpc = resolve_rpc_url(source, args.rpc.rpc_url.as_deref())?;
     let solana_client = solana_rpc_client(source_rpc);
 
@@ -452,7 +448,12 @@ async fn run_solana_bridge(
         },
     )?;
     let recent_blockhash = latest_blockhash(&solana_client)?;
-    let burn_tx = build_signed_transaction(&[instruction], &solana_signer, recent_blockhash);
+    let burn_tx = build_signed_transaction_with_signers(
+        &[instruction],
+        &solana_signer,
+        &[&solana_signer, &event_keypair],
+        recent_blockhash,
+    );
     let burn_sent = send_and_confirm_solana_transaction(&solana_client, &burn_tx)?;
 
     if args.no_wait {

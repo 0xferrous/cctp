@@ -26,9 +26,10 @@ use crate::{
     output::print_json,
     solana::{
         DepositForBurnAccountsV2, DepositForBurnParamsV2, build_deposit_for_burn_instruction_v2,
-        build_signed_transaction, cctp_v2_deposit_for_burn_pdas, derive_keypair_from_mnemonic,
-        evm_address_to_pubkey_bytes32, finality_threshold_for_speed, latest_blockhash,
-        parse_pubkey_arg, send_and_confirm_transaction, solana_rpc_client, solana_usdc_mint,
+        build_signed_transaction_with_signers, cctp_v2_deposit_for_burn_pdas,
+        derive_keypair_from_mnemonic, evm_address_to_pubkey_bytes32, finality_threshold_for_speed,
+        latest_blockhash, parse_pubkey_arg, send_and_confirm_transaction, solana_rpc_client,
+        solana_usdc_mint, usdc_associated_token_address,
     },
 };
 
@@ -229,15 +230,6 @@ async fn run_solana_burn(
         .ok_or_else(|| {
             CliError::InvalidInput("missing --solana-mnemonic for Solana burn".into())
         })?;
-    let burn_token_account = parse_pubkey_arg(
-        "solana token account",
-        args.solana_wallet
-            .solana_token_account
-            .as_deref()
-            .ok_or_else(|| {
-                CliError::InvalidInput("missing --solana-token-account for Solana burn".into())
-            })?,
-    )?;
     let amount_atomic = parse_usdc_amount(&args.amount)?;
     let amount = u64::try_from(amount_atomic)
         .map_err(|_| CliError::InvalidInput("Solana burn amount exceeds u64 token units".into()))?;
@@ -249,6 +241,10 @@ async fn run_solana_burn(
         args.solana_wallet.signer.solana_account_index,
     )?;
     let sender = signer.pubkey();
+    let burn_token_account = match args.solana_wallet.solana_token_account.as_deref() {
+        Some(account) => parse_pubkey_arg("solana token account", account)?,
+        None => usdc_associated_token_address(&sender, source.env)?,
+    };
     let rpc_url = resolve_rpc_url(source, args.rpc.rpc_url.as_deref())?;
     let client = solana_rpc_client(rpc_url);
     let iris = iris_client(source.env);
@@ -284,7 +280,12 @@ async fn run_solana_burn(
         },
     )?;
     let recent_blockhash = latest_blockhash(&client)?;
-    let tx = build_signed_transaction(&[instruction], &signer, recent_blockhash);
+    let tx = build_signed_transaction_with_signers(
+        &[instruction],
+        &signer,
+        &[&signer, &event_keypair],
+        recent_blockhash,
+    );
     let sent = send_and_confirm_transaction(&client, &tx)?;
 
     let out = BurnOutput {

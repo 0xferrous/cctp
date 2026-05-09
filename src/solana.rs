@@ -176,10 +176,19 @@ pub(crate) fn build_signed_transaction(
     signer: &Keypair,
     recent_blockhash: Hash,
 ) -> Transaction {
+    build_signed_transaction_with_signers(instructions, signer, &[signer], recent_blockhash)
+}
+
+pub(crate) fn build_signed_transaction_with_signers(
+    instructions: &[Instruction],
+    payer: &Keypair,
+    signers: &[&Keypair],
+    recent_blockhash: Hash,
+) -> Transaction {
     Transaction::new_signed_with_payer(
         instructions,
-        Some(&signer.pubkey()),
-        &[signer],
+        Some(&payer.pubkey()),
+        signers,
         recent_blockhash,
     )
 }
@@ -317,6 +326,14 @@ pub(crate) fn associated_token_address(owner: &Pubkey, mint: &Pubkey) -> Result<
         &[owner.as_ref(), token_program.as_ref(), mint.as_ref()],
         &ata_program,
     ))
+}
+
+pub(crate) fn usdc_associated_token_address(
+    owner: &Pubkey,
+    env: BridgeEnvironment,
+) -> Result<Pubkey> {
+    let mint = solana_usdc_mint(env)?;
+    associated_token_address(owner, &mint)
 }
 
 pub(crate) fn build_receive_message_instruction_from_canonical_message_v2(
