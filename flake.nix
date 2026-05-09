@@ -58,21 +58,5 @@
           default = cctp;
         };
 
-        devShells.default = pkgs.mkShell {
-          packages = with pkgs; [
-            rustc
-            cargo
-            rustfmt
-            clippy
-            openssl
-            pkg-config
-            rust-analyzer
-          ];
-
-          shellHook = ''
-            echo "CCTP dev shell"
-            echo "Available: cargo, rustc, rustfmt, clippy, rust-analyzer"
-          '';
-        };
       });
 }
