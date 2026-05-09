@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use indicatif::{ProgressBar, ProgressStyle};
+use reqwest::StatusCode;
 
 use alloy_provider::Provider;
 use alloy_sol_types::sol;
@@ -557,13 +558,20 @@ async fn wait_for_complete_attestation(
         .then(|| make_spinner(&format!("Waiting for attestation for burn tx {tx_hash}...")));
 
     loop {
-        let attestation = iris
+        let attestation = match iris
             .attestation(
                 source_domain,
                 circle_iris::MessageLookup::TransactionHash(tx_hash),
             )
             .await
-            .map_err(|e| CliError::Iris(e.to_string()))?;
+        {
+            Ok(attestation) => attestation,
+            Err(error) if is_attestation_pending(&error) => {
+                tokio::time::sleep(Duration::from_secs(2)).await;
+                continue;
+            }
+            Err(error) => return Err(CliError::Iris(error.to_string())),
+        };
 
         if attestation.status == circle_iris::AttestationStatus::Complete
             && attestation.message.is_some()
@@ -576,6 +584,16 @@ async fn wait_for_complete_attestation(
         }
 
         tokio::time::sleep(Duration::from_secs(2)).await;
+    }
+}
+
+fn is_attestation_pending(error: &circle_iris::Error) -> bool {
+    match error {
+        circle_iris::Error::Network(err) => err.status() == Some(StatusCode::NOT_FOUND),
+        circle_iris::Error::Api(message) => {
+            message.contains("404") || message.to_ascii_lowercase().contains("not found")
+        }
+        circle_iris::Error::InvalidValue(_) => false,
     }
 }
 
