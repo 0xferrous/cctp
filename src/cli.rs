@@ -77,7 +77,7 @@ pub(crate) struct EstimateArgs {
     pub to_chain: String,
     #[arg(long)]
     pub amount: String,
-    #[arg(long, value_enum, default_value_t = TransferSpeedArg::Fast)]
+    #[arg(long, value_enum, default_value_t = TransferSpeedArg::Standard)]
     pub speed: TransferSpeedArg,
     #[arg(long)]
     pub json: bool,
@@ -115,7 +115,7 @@ pub(crate) struct BurnArgs {
     pub amount: String,
     #[arg(long)]
     pub recipient: String,
-    #[arg(long, value_enum, default_value_t = TransferSpeedArg::Fast)]
+    #[arg(long, value_enum, default_value_t = TransferSpeedArg::Standard)]
     pub speed: TransferSpeedArg,
     #[command(flatten)]
     pub wallet: WalletOpts,
@@ -155,7 +155,7 @@ pub(crate) struct BridgeArgs {
     pub amount: String,
     #[arg(long)]
     pub recipient: String,
-    #[arg(long, value_enum, default_value_t = TransferSpeedArg::Fast)]
+    #[arg(long, value_enum, default_value_t = TransferSpeedArg::Standard)]
     pub speed: TransferSpeedArg,
     #[arg(long)]
     pub no_wait: bool,
@@ -203,7 +203,7 @@ pub(crate) struct ReattestArgs {
 
 #[derive(Args, Debug, Default)]
 pub(crate) struct SolanaSignerArgs {
-    #[arg(long = "solana-mnemonic")]
+    #[arg(long = "solana-mnemonic", env = "SOLANA_MNEMONIC")]
     pub solana_mnemonic: Option<String>,
     #[arg(long = "solana-passphrase", default_value_t = String::new())]
     pub solana_passphrase: String,
