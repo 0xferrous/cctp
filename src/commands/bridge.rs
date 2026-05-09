@@ -137,6 +137,9 @@ async fn run_evm_bridge(
         .await
         .map_err(|e| CliError::Rpc(e.to_string()))?;
     wait_for_receipt(&source_provider, burn_tx_hash, "burn").await?;
+    if !args.json {
+        print_step_completed("Burn completed");
+    }
 
     if args.no_wait {
         let out = BridgeOutput {
@@ -171,6 +174,9 @@ async fn run_evm_bridge(
         .get_attestation(burn_tx_hash, polling_config(args.speed))
         .await
         .map_err(|e| CliError::Iris(e.to_string()))?;
+    if !args.json {
+        print_step_completed("Attestations completed");
+    }
 
     let iris_attestation = iris
         .attestation(
@@ -189,9 +195,17 @@ async fn run_evm_bridge(
     let (claim_tx_hash, final_phase) = match mint_result {
         cctp_rs::MintResult::Minted(tx_hash) => {
             wait_for_receipt(&destination_provider, tx_hash, "claim").await?;
+            if !args.json {
+                print_step_completed("Claim completed");
+            }
             (Some(tx_hash.to_string()), "claimed".to_owned())
         }
-        cctp_rs::MintResult::AlreadyRelayed => (None, "already_claimed".to_owned()),
+        cctp_rs::MintResult::AlreadyRelayed => {
+            if !args.json {
+                print_step_completed("Claim already completed");
+            }
+            (None, "already_claimed".to_owned())
+        }
     };
 
     let out = BridgeOutput {
@@ -295,6 +309,9 @@ async fn run_evm_to_solana_bridge(
         .map_err(|e| CliError::Rpc(e.to_string()))?;
     let burn_tx_hash = *pending_tx.tx_hash();
     wait_for_receipt(&source_provider, burn_tx_hash, "burn").await?;
+    if !args.json {
+        print_step_completed("Burn completed");
+    }
 
     if args.no_wait {
         let out = BridgeOutput {
@@ -334,6 +351,9 @@ async fn run_evm_to_solana_bridge(
         !args.json,
     )
     .await?;
+    if !args.json {
+        print_step_completed("Attestations completed");
+    }
     let nonce = iris_attestation.nonce.clone();
     let message_hex = iris_attestation
         .message
@@ -354,6 +374,9 @@ async fn run_evm_to_solana_bridge(
     let recent_blockhash = latest_blockhash(&solana_client)?;
     let claim_tx = build_signed_transaction(&[instruction], &solana_signer, recent_blockhash);
     let claim_sent = send_and_confirm_solana_transaction(&solana_client, &claim_tx)?;
+    if !args.json {
+        print_step_completed("Claim completed");
+    }
 
     let out = BridgeOutput {
         source_chain: source.name.to_owned(),
@@ -457,6 +480,9 @@ async fn run_solana_bridge(
         recent_blockhash,
     );
     let burn_sent = send_and_confirm_solana_transaction(&solana_client, &burn_tx)?;
+    if !args.json {
+        print_step_completed("Burn completed");
+    }
 
     if args.no_wait {
         let out = BridgeOutput {
@@ -496,6 +522,9 @@ async fn run_solana_bridge(
         !args.json,
     )
     .await?;
+    if !args.json {
+        print_step_completed("Attestations completed");
+    }
     let nonce = iris_attestation.nonce.clone();
     let message_hex = iris_attestation
         .message
@@ -525,6 +554,9 @@ async fn run_solana_bridge(
             .map_err(|e| CliError::Rpc(e.to_string()))?;
         let tx_hash = *pending_tx.tx_hash();
         wait_for_receipt(&destination_provider, tx_hash, "claim").await?;
+        if !args.json {
+            print_step_completed("Claim completed");
+        }
         Some(tx_hash.to_string())
     };
 
@@ -554,10 +586,16 @@ async fn wait_for_complete_attestation(
     tx_hash: &str,
     show_spinner: bool,
 ) -> Result<circle_iris::AttestationResponse> {
-    let spinner = show_spinner
-        .then(|| make_spinner(&format!("Waiting for attestation for burn tx {tx_hash}...")));
+    let spinner = show_spinner.then(|| make_spinner("Waiting for attestation..."));
+    let mut attempt = 1u64;
 
     loop {
+        if let Some(spinner) = spinner.as_ref() {
+            spinner.set_message(format!(
+                "Waiting for attestation (attempt {attempt}) for burn tx {tx_hash}..."
+            ));
+        }
+
         let attestation = match iris
             .attestation(
                 source_domain,
@@ -567,6 +605,7 @@ async fn wait_for_complete_attestation(
         {
             Ok(attestation) => attestation,
             Err(error) if is_attestation_pending(&error) => {
+                attempt += 1;
                 tokio::time::sleep(Duration::from_secs(2)).await;
                 continue;
             }
@@ -583,6 +622,7 @@ async fn wait_for_complete_attestation(
             return Ok(attestation);
         }
 
+        attempt += 1;
         tokio::time::sleep(Duration::from_secs(2)).await;
     }
 }
@@ -595,6 +635,10 @@ fn is_attestation_pending(error: &circle_iris::Error) -> bool {
         }
         circle_iris::Error::InvalidValue(_) => false,
     }
+}
+
+fn print_step_completed(label: &str) {
+    println!("✓ {label}");
 }
 
 fn print_bridge_burn(out: &BridgeOutput) -> Result<()> {
