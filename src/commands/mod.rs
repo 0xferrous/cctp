@@ -6,4 +6,5 @@ pub mod claim;
 pub mod debug;
 pub mod estimate;
 pub mod reattest;
+pub mod reclaim;
 pub mod status;

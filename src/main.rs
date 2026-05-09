@@ -34,6 +34,7 @@ async fn run() -> Result<()> {
         Command::Claim(args) => commands::claim::run(args).await,
         Command::Bridge(args) => commands::bridge::run(args).await,
         Command::Debug(args) => commands::debug::run(args.command).await,
+        Command::Reclaim(args) => commands::reclaim::run(args).await,
         Command::Reattest(args) => commands::reattest::run(args).await,
     }
 }

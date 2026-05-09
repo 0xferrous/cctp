@@ -1608,6 +1608,7 @@ dependencies = [
  "solana-keypair",
  "solana-sdk",
  "solana-seed-phrase",
+ "solana-transaction-status-client-types",
  "thiserror 2.0.18",
  "tokio",
 ]

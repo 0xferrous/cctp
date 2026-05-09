@@ -13,6 +13,7 @@ Implemented commands:
 - `cctp claim`
 - `cctp bridge`
 - `cctp debug usdc-ata`
+- `cctp reclaim`
 - `cctp reattest`
 
 Current execution scope:
@@ -192,6 +193,21 @@ Request re-attestation:
 ```bash
 cargo run -- reattest --from base-sepolia --nonce 0x...
 ```
+
+Reclaim a Solana event account after the 5-day event account window:
+
+```bash
+cargo run -- reclaim \
+  --source-chain solana-devnet \
+  --tx <SOLANA_BURN_SIGNATURE> \
+  --solana-mnemonic "..." \
+  --solana-account-index 0 \
+  --rpc-url https://api.devnet.solana.com
+```
+
+Pass `--event-account` to override auto-derivation from the burn transaction.
+
+You can reclaim only after the 5-day event account window has expired.
 
 ## Wallets
 

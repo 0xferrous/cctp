@@ -29,6 +29,8 @@ pub(crate) enum Command {
     Bridge(BridgeArgs),
     /// Inspect derived values for Solana flows
     Debug(DebugArgs),
+    /// Reclaim a Solana event account after the 5-day event account window
+    Reclaim(ReclaimArgs),
     /// Request re-attestation for a CCTP nonce through Iris
     Reattest(ReattestArgs),
 }
@@ -187,6 +189,22 @@ pub(crate) struct UsdcAtaArgs {
     pub testnet: bool,
     #[command(flatten)]
     pub signer: SolanaSignerArgs,
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Args, Debug)]
+pub(crate) struct ReclaimArgs {
+    #[arg(long = "source-chain")]
+    pub from_chain: String,
+    #[arg(long)]
+    pub tx: String,
+    #[arg(long = "event-account")]
+    pub event_account: Option<String>,
+    #[command(flatten)]
+    pub solana_signer: SolanaSignerArgs,
+    #[command(flatten)]
+    pub rpc: RpcArgs,
     #[arg(long)]
     pub json: bool,
 }

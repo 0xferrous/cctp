@@ -7,7 +7,9 @@ use solana_client::{
     rpc_client::RpcClient,
     rpc_config::{
         CommitmentConfig, CommitmentLevel, RpcSendTransactionConfig, RpcSimulateTransactionConfig,
+        RpcTransactionConfig, UiTransactionEncoding,
     },
+    rpc_response::EncodedTransaction,
 };
 use solana_derivation_path::DerivationPath;
 use solana_keypair::{Keypair, seed_derivable::keypair_from_seed_and_derivation_path};
@@ -19,6 +21,7 @@ use solana_sdk::{
     transaction::Transaction,
 };
 use solana_seed_phrase::generate_seed_from_seed_phrase_and_passphrase;
+use solana_transaction_status_client_types::{UiCompiledInstruction, UiMessage};
 
 use crate::{
     chain::BridgeEnvironment,
@@ -96,6 +99,12 @@ pub(crate) struct DepositForBurnParamsV2 {
 #[derive(Clone, Debug)]
 pub(crate) struct ReceiveMessageParamsV2 {
     pub message: Vec<u8>,
+    pub attestation: Vec<u8>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ReclaimEventAccountParamsV2 {
+    pub destination_message: Vec<u8>,
     pub attestation: Vec<u8>,
 }
 
@@ -564,6 +573,37 @@ pub(crate) fn encode_receive_message_data_v2(params: &ReceiveMessageParamsV2) ->
     Ok(data)
 }
 
+pub(crate) fn encode_reclaim_event_account_data_v2(
+    params: &ReclaimEventAccountParamsV2,
+) -> Result<Vec<u8>> {
+    let mut data =
+        Vec::with_capacity(8 + 4 + params.destination_message.len() + 4 + params.attestation.len());
+    data.extend_from_slice(&anchor_discriminator("reclaim_event_account"));
+    extend_borsh_bytes(&mut data, &params.attestation)?;
+    extend_borsh_bytes(&mut data, &params.destination_message)?;
+    Ok(data)
+}
+
+pub(crate) fn build_reclaim_event_account_instruction_v2(
+    payee: Pubkey,
+    event_account: Pubkey,
+    params: &ReclaimEventAccountParamsV2,
+) -> Result<Instruction> {
+    let programs = cctp_v2_programs()?;
+    Ok(Instruction {
+        program_id: programs.message_transmitter,
+        accounts: vec![
+            AccountMeta::new(payee, true),
+            AccountMeta::new(
+                message_transmitter_pda(&programs.message_transmitter),
+                false,
+            ),
+            AccountMeta::new(event_account, false),
+        ],
+        data: encode_reclaim_event_account_data_v2(params)?,
+    })
+}
+
 pub(crate) fn build_deposit_for_burn_instruction_v2(
     accounts: &DepositForBurnAccountsV2,
     params: &DepositForBurnParamsV2,
@@ -622,6 +662,62 @@ pub(crate) fn build_receive_message_instruction_v2(
         accounts: metas,
         data: encode_receive_message_data_v2(params)?,
     })
+}
+
+pub(crate) fn extract_message_sent_event_account_from_transaction(
+    client: &RpcClient,
+    tx_hash: &str,
+) -> Result<Pubkey> {
+    let signature = Signature::from_str(tx_hash)
+        .map_err(|e| CliError::InvalidInput(format!("invalid tx signature: {e}")))?;
+
+    let tx = client
+        .get_transaction_with_config(
+            &signature,
+            RpcTransactionConfig {
+                encoding: Some(UiTransactionEncoding::Json),
+                commitment: Some(CommitmentConfig::confirmed()),
+                max_supported_transaction_version: Some(0),
+            },
+        )
+        .map_err(|e| CliError::Rpc(format!("failed to fetch Solana transaction: {e}")))?;
+
+    let ui_tx = match tx.transaction.transaction {
+        EncodedTransaction::Json(tx) => tx,
+        _ => {
+            return Err(CliError::InvalidInput(
+                "expected a JSON-encoded Solana transaction".into(),
+            ));
+        }
+    };
+
+    let raw_message = match ui_tx.message {
+        UiMessage::Raw(raw) => raw,
+        UiMessage::Parsed(_) => {
+            return Err(CliError::InvalidInput(
+                "unexpected parsed Solana transaction; try --event-account".into(),
+            ));
+        }
+    };
+
+    let event_account = raw_message
+        .instructions
+        .iter()
+        .find_map(|ix: &UiCompiledInstruction| {
+            let program_key = raw_message.account_keys.get(ix.program_id_index as usize)?;
+            if program_key != TOKEN_MESSENGER_MINTER_V2_PROGRAM_ID {
+                return None;
+            }
+            let event_key_index = *ix.accounts.get(3)? as usize;
+            raw_message.account_keys.get(event_key_index).cloned()
+        })
+        .ok_or_else(|| {
+            CliError::InvalidInput(format!(
+                "could not find MessageSent event account in transaction {tx_hash}"
+            ))
+        })?;
+
+    parse_pubkey(&event_account)
 }
 
 fn extend_borsh_bytes(buffer: &mut Vec<u8>, value: &[u8]) -> Result<()> {
