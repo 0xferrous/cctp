@@ -12,6 +12,7 @@ Implemented commands:
 - `cctp burn`
 - `cctp claim`
 - `cctp bridge`
+- `cctp debug usdc-ata`
 - `cctp reattest`
 
 Current execution scope:
@@ -209,6 +210,18 @@ Run command help to see the full set:
 ```bash
 cargo run -- burn --help
 ```
+
+## Solana token accounts
+
+For Solana burns/bridges, `--solana-token-account` is the USDC SPL token account that will be debited.
+If you omit it, the CLI derives the canonical USDC associated token account (ATA) from:
+- the Solana wallet pubkey
+- the USDC mint for the selected environment
+- the SPL token program
+- the associated token account program
+
+The ATA is the default account most wallets use for a given mint.
+Use `cctp debug usdc-ata --solana-mnemonic "..."` to print the derived USDC ATA.
 
 ## Output
 

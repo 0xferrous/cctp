@@ -33,6 +33,7 @@ async fn run() -> Result<()> {
         Command::Burn(args) => commands::burn::run(args).await,
         Command::Claim(args) => commands::claim::run(args).await,
         Command::Bridge(args) => commands::bridge::run(args).await,
+        Command::Debug(args) => commands::debug::run(args.command).await,
         Command::Reattest(args) => commands::reattest::run(args).await,
     }
 }

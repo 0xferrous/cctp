@@ -3,6 +3,7 @@ pub mod bridge;
 pub mod burn;
 pub mod chains;
 pub mod claim;
+pub mod debug;
 pub mod estimate;
 pub mod reattest;
 pub mod status;

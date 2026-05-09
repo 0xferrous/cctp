@@ -27,6 +27,8 @@ pub(crate) enum Command {
     Claim(ClaimArgs),
     /// Run the full burn -> attestation -> claim flow
     Bridge(BridgeArgs),
+    /// Inspect derived values for Solana flows
+    Debug(DebugArgs),
     /// Request re-attestation for a CCTP nonce through Iris
     Reattest(ReattestArgs),
 }
@@ -163,6 +165,28 @@ pub(crate) struct BridgeArgs {
     pub solana_wallet: SolanaWalletArgs,
     #[command(flatten)]
     pub rpc: RpcArgs,
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Args, Debug)]
+pub(crate) struct DebugArgs {
+    #[command(subcommand)]
+    pub command: DebugCommand,
+}
+
+#[derive(Subcommand, Debug)]
+pub(crate) enum DebugCommand {
+    /// Derive the USDC associated token account for a Solana wallet
+    UsdcAta(UsdcAtaArgs),
+}
+
+#[derive(Args, Debug)]
+pub(crate) struct UsdcAtaArgs {
+    #[arg(long)]
+    pub testnet: bool,
+    #[command(flatten)]
+    pub signer: SolanaSignerArgs,
     #[arg(long)]
     pub json: bool,
 }
