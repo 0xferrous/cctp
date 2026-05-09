@@ -1,5 +1,7 @@
 use std::time::Duration;
 
+use indicatif::{ProgressBar, ProgressStyle};
+
 use alloy_provider::Provider;
 use alloy_sol_types::sol;
 use cctp_rs::{CctpV2, MessageTransmitterV2Contract, TokenMessengerV2Contract};
@@ -204,28 +206,7 @@ async fn run_evm_bridge(
         final_phase,
     };
 
-    if args.json {
-        print_json(&out)?;
-    } else {
-        println!("Source chain: {}", out.source_chain);
-        println!("Destination chain: {}", out.destination_chain);
-        println!("Amount: {} USDC", out.amount);
-        println!("Recipient: {}", out.recipient);
-        if let Some(tx_hash) = out.approval_tx_hash.as_deref() {
-            println!("Approval tx: {tx_hash}");
-        }
-        println!("Burn tx: {}", out.burn_tx_hash);
-        if let Some(nonce) = out.nonce.as_deref() {
-            println!("Nonce: {nonce}");
-        }
-        println!("Attestation: {}", out.attestation_status);
-        if let Some(tx_hash) = out.claim_tx_hash.as_deref() {
-            println!("Claim tx: {tx_hash}");
-        }
-        println!("Final phase: {}", out.final_phase);
-    }
-
-    print_output(&out, args.json)
+    print_bridge_complete(&out, args.json)
 }
 
 async fn run_evm_to_solana_bridge(
@@ -327,11 +308,31 @@ async fn run_evm_to_solana_bridge(
             claim_tx_hash: None,
             final_phase: "burned".into(),
         };
-        return print_output(&out, args.json);
+        return print_bridge_complete(&out, args.json);
     }
 
-    let iris_attestation =
-        wait_for_complete_attestation(&iris, source.cctp_domain, &burn_tx_hash.to_string()).await?;
+    if !args.json {
+        print_bridge_burn(&BridgeOutput {
+            source_chain: source.name.to_owned(),
+            destination_chain: destination.name.to_owned(),
+            amount: format_usdc(amount_atomic),
+            recipient: recipient_label.clone(),
+            approval_tx_hash: approval_tx_hash.map(|tx| tx.to_string()),
+            burn_tx_hash: burn_tx_hash.to_string(),
+            nonce: None,
+            attestation_status: "waiting".into(),
+            claim_tx_hash: None,
+            final_phase: "burned".into(),
+        })?;
+    }
+
+    let iris_attestation = wait_for_complete_attestation(
+        &iris,
+        source.cctp_domain,
+        &burn_tx_hash.to_string(),
+        !args.json,
+    )
+    .await?;
     let nonce = iris_attestation.nonce.clone();
     let message_hex = iris_attestation
         .message
@@ -366,7 +367,7 @@ async fn run_evm_to_solana_bridge(
         final_phase: "claimed".into(),
     };
 
-    print_output(&out, args.json)
+    print_bridge_final(&out, args.json)
 }
 
 async fn run_solana_bridge(
@@ -469,12 +470,31 @@ async fn run_solana_bridge(
             claim_tx_hash: None,
             final_phase: "burned".into(),
         };
-        return print_output(&out, args.json);
+        return print_bridge_complete(&out, args.json);
     }
 
-    let iris_attestation =
-        wait_for_complete_attestation(&iris, source.cctp_domain, &burn_sent.signature.to_string())
-            .await?;
+    if !args.json {
+        print_bridge_burn(&BridgeOutput {
+            source_chain: source.name.to_owned(),
+            destination_chain: destination.name.to_owned(),
+            amount: format_usdc(amount_atomic),
+            recipient: recipient.to_string(),
+            approval_tx_hash: None,
+            burn_tx_hash: burn_sent.signature.to_string(),
+            nonce: None,
+            attestation_status: "waiting".into(),
+            claim_tx_hash: None,
+            final_phase: "burned".into(),
+        })?;
+    }
+
+    let iris_attestation = wait_for_complete_attestation(
+        &iris,
+        source.cctp_domain,
+        &burn_sent.signature.to_string(),
+        !args.json,
+    )
+    .await?;
     let nonce = iris_attestation.nonce.clone();
     let message_hex = iris_attestation
         .message
@@ -524,14 +544,18 @@ async fn run_solana_bridge(
         },
     };
 
-    print_output(&out, args.json)
+    print_bridge_final(&out, args.json)
 }
 
 async fn wait_for_complete_attestation(
     iris: &circle_iris::IrisClient,
     source_domain: u32,
     tx_hash: &str,
+    show_spinner: bool,
 ) -> Result<circle_iris::AttestationResponse> {
+    let spinner = show_spinner
+        .then(|| make_spinner(&format!("Waiting for attestation for burn tx {tx_hash}...")));
+
     loop {
         let attestation = iris
             .attestation(
@@ -545,6 +569,9 @@ async fn wait_for_complete_attestation(
             && attestation.message.is_some()
             && attestation.attestation.is_some()
         {
+            if let Some(spinner) = spinner.as_ref() {
+                spinner.finish_and_clear();
+            }
             return Ok(attestation);
         }
 
@@ -552,18 +579,33 @@ async fn wait_for_complete_attestation(
     }
 }
 
-fn print_output(out: &BridgeOutput, json: bool) -> Result<()> {
+fn print_bridge_burn(out: &BridgeOutput) -> Result<()> {
+    println!("Source chain: {}", out.source_chain);
+    println!("Destination chain: {}", out.destination_chain);
+    println!("Amount: {} USDC", out.amount);
+    println!("Recipient: {}", out.recipient);
+    if let Some(tx_hash) = out.approval_tx_hash.as_deref() {
+        println!("Approval tx: {tx_hash}");
+    }
+    println!("Burn tx: {}", out.burn_tx_hash);
+    Ok(())
+}
+
+fn print_bridge_complete(out: &BridgeOutput, json: bool) -> Result<()> {
     if json {
         print_json(out)?;
     } else {
-        println!("Source chain: {}", out.source_chain);
-        println!("Destination chain: {}", out.destination_chain);
-        println!("Amount: {} USDC", out.amount);
-        println!("Recipient: {}", out.recipient);
-        if let Some(tx_hash) = out.approval_tx_hash.as_deref() {
-            println!("Approval tx: {tx_hash}");
-        }
-        println!("Burn tx: {}", out.burn_tx_hash);
+        print_bridge_burn(out)?;
+        print_bridge_final(out, false)?;
+    }
+
+    Ok(())
+}
+
+fn print_bridge_final(out: &BridgeOutput, json: bool) -> Result<()> {
+    if json {
+        print_json(out)?;
+    } else {
         if let Some(nonce) = out.nonce.as_deref() {
             println!("Nonce: {nonce}");
         }
@@ -575,4 +617,15 @@ fn print_output(out: &BridgeOutput, json: bool) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn make_spinner(message: &str) -> ProgressBar {
+    let spinner = ProgressBar::new_spinner();
+    spinner.set_style(
+        ProgressStyle::with_template("{spinner:.green} {msg}")
+            .unwrap_or_else(|_| ProgressStyle::default_spinner()),
+    );
+    spinner.enable_steady_tick(Duration::from_millis(100));
+    spinner.set_message(message.to_owned());
+    spinner
 }
