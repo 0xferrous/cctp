@@ -54,6 +54,7 @@ const SEED_SENDER_AUTHORITY: &[u8] = b"sender_authority";
 const SEED_DENYLIST_ACCOUNT: &[u8] = b"denylist_account";
 const SEED_MESSAGE_TRANSMITTER_AUTHORITY: &[u8] = b"message_transmitter_authority";
 const SEED_EVENT_AUTHORITY: &[u8] = b"__event_authority";
+const DEPOSIT_FOR_BURN_MESSAGE_SENT_EVENT_ACCOUNT_INDEX: usize = 11;
 
 #[derive(Clone, Debug)]
 pub(crate) struct SolanaCctpV2Programs {
@@ -708,12 +709,30 @@ pub(crate) fn extract_message_sent_event_account_from_transaction(
             if program_key != TOKEN_MESSENGER_MINTER_V2_PROGRAM_ID {
                 return None;
             }
-            let event_key_index = *ix.accounts.get(3)? as usize;
-            raw_message.account_keys.get(event_key_index).cloned()
+            if ix.accounts.len() <= DEPOSIT_FOR_BURN_MESSAGE_SENT_EVENT_ACCOUNT_INDEX {
+                return Some(Err(CliError::InvalidInput(format!(
+                    "transaction {tx_hash} looks like a CCTP v2 instruction but has only {} accounts; expected at least {}",
+                    ix.accounts.len(),
+                    DEPOSIT_FOR_BURN_MESSAGE_SENT_EVENT_ACCOUNT_INDEX + 1
+                ))));
+            }
+            let event_key_index = ix.accounts[DEPOSIT_FOR_BURN_MESSAGE_SENT_EVENT_ACCOUNT_INDEX] as usize;
+            Some(
+                raw_message
+                    .account_keys
+                    .get(event_key_index)
+                    .cloned()
+                    .ok_or_else(|| {
+                        CliError::InvalidInput(format!(
+                            "transaction {tx_hash} references missing event account index {event_key_index}"
+                        ))
+                    }),
+            )
         })
+        .transpose()?
         .ok_or_else(|| {
             CliError::InvalidInput(format!(
-                "could not find MessageSent event account in transaction {tx_hash}"
+                "could not find a CCTP v2 deposit_for_burn instruction in transaction {tx_hash}"
             ))
         })?;
 
