@@ -24,9 +24,9 @@
             x86_64-darwin = "https://binaries.soliditylang.org/macosx-amd64/list.json";
           }.${system};
           sha256 = {
-            x86_64-linux = "1labmjyg3vpyjr2q6idhy3wzsj92wxj3qvf32h0g2b8nsnhf0z1g";
-            aarch64-linux = "15j5p9iz51npy2jjfaqkwwd4gbkapnry8jzq41yv1y7qwg1z0d8v";
-            x86_64-darwin = "0ika5973adqvbw5nk5h46wjymwzr3sq92vahzcmvrw6adif1v8wz";
+            x86_64-linux = "0rz3jlwqfnk05avhyiss72mgv4r8862js7ka2x8kz49fdlgdzfd2";
+            aarch64-linux = "1franjddiw8j4fdzp4ff899xx6s7dajrd1i0647xvzr1kdl2c42h";
+            x86_64-darwin = "0lp280xgzv20w9zm7bjfvp9hm4bs6iq88zirn9b6hvqvga6vgc6w";
           }.${system};
         };
 
